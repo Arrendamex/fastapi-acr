@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1
+
+#############################################
+# Etapa 1: Compilar imagen dev-dependencies #
+#############################################
+
+# Obtener la imagen de Python
+FROM cgr.dev/chainguard/python:latest-dev AS dev
+# Crear un directorio de trabajo y establecerlo como el directorio de trabajo actual
+WORKDIR /app
+# Crear una ambiente virtual para instalar las dependencias
+RUN python -m venv venv
+# Establecer el ambiente virtual al PATH para ser accesible desde Python
+ENV PATH="/app/venv/bin:$PATH"
+# Copiar la lista de dependencias al directorio de trabajo
+COPY requirements.txt requirements.txt
+# Instalar las dependencias
+RUN pip install -r requirements.txt
+# Eliminar pip para evitar conflictos con CVE
+RUN pip uninstall -y pip
+
+
+#############################################
+# Etapa 2: Compilar imagen de producción    #
+#############################################
+# Obtener la imagen de Python mínima
+FROM cgr.dev/chainguard/python:latest AS prod
+# Crear un directorio de trabajo y establecerlo como el directorio de trabajo actual
+WORKDIR /app
+# Copiar el código fuente al directorio de trabajo
+COPY . /app/
+# Copiar el ambiente virtual de la imagen dev-dependencies
+COPY --from=dev /app/venv /app/venv
+# Establecer el ambiente virtual al PATH para ser accesible desde Python
+ENV PATH="/app/venv/bin:$PATH"
+
+# Exponer el puerto 8000 del contenedor
+EXPOSE 8000
+
+# Establecer el punto de entrada para ejecutar la aplicación
+ENTRYPOINT ["fastapi", "run", "main.py"]
