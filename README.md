@@ -273,7 +273,8 @@ El servicio te pedirá el nombre de usuario y un token de acceso. Cópialos y p�
 
 # ⚡ Desplegar aplicación de React + Vite en App Service
 
-<imagen de fastapi+appservice+acr>
+![fastapi+appservice+container_registry](https://github.com/user-attachments/assets/6a189c45-23a0-43a0-8e31-9d0854a52c01)
+
 
 ## 🧪App Service - Ambiente de pruebas
 
