@@ -273,53 +273,12 @@ El servicio te pedirá el nombre de usuario y un token de acceso. Cópialos y p�
 
 # ⚡ Desplegar aplicación de React + Vite en App Service
 
-![vite+appservice+containerregistry](https://github.com/user-attachments/assets/d5ac9ea7-cb27-403c-8e8c-148b61af1d9c)
+<imagen de fastapi+appservice+acr>
 
 ## 🧪App Service - Ambiente de pruebas
 
 Para desplegar la aplicación en el ambiente de pruebas, se necesitan algunos conocimientos básicos de Docker, de Git y de la terminal para administrar los recursos de Azure CLI.
 Los pasos para seguir se describen a continuación:
-
-## ⚡ Modificar configuraciones en `vite.config.js`
-
-Antes de crear la imagen de Docker del proyecto, se necesita que éste siempre se monte en un puerto permanente, es decir, un puerto definido por el usuario. En este caso, podríamos usar el puerto 3000 para tal uso. Para lograrlo, necesitamos hacer unos ajustes mínimos en el archivo de configuracion de `vite.config.js`:
-
-| Opción       | Descripción                                                                                                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `base`       | Ruta pública base cuando se sirve en desarrollo o producción                                                                                                                                                                   |
-| `plugins`    | Array de plugins a usar                                                                                                                                                                                                        |
-| `preview`    | Un objeto para las opciones de vista previa de la compilación                                                                                                                                                                  |
-| `server`     | Un objeto para las opciones del servidor                                                                                                                                                                                       |
-| `port`       | Especifica el puerto del servidor. Nota: si el puerto ya está siendo usado, Vite intentará automáticamente con el siguiente puerto disponible, por lo que este puede no ser el puerto en el que el servidor termine escuchando |
-| `strictPort` | Establece a true para salir si el puerto ya está en uso, en lugar de intentar automáticamente con el siguiente puerto disponible                                                                                               |
-| `host`       | Especifica en qué direcciones IP debe escuchar el servidor. Establece esto a 0.0.0.0 o true para escuchar todas las direcciones, incluidas las de LAN y públicas                                                               |
-| `origin`     | Define el origen de las URLs de los activos generados durante el desarrollo                                                                                                                                                    |
-
-`vite.config.json`
-
-```raw
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  /* Referencia
-    https://thedkpatel.medium.com/dockerizing-react-application-built-with-vite-a-simple-guide-4c41eb09defa
-  */
-  base: "/",
-  preview: { // Configuraciones para el production preview
-    port: 3000,
-    strictPort: true,
-  },
-  server: { // Configuraciones para el development preview
-    port: 3000,
-    strictPort: true,
-    host: true,
-    origin: "http://localhost:3000"
-  }
-})
-```
 
 ## 💻 Crear un Dockerfile
 
@@ -335,24 +294,26 @@ export default defineConfig({
 # Etapa 1: Compilar imagen dev-dependencies #
 #############################################
 
-# Usa una imagen base de Node.js
-FROM node:18-alpine
-# Establece el directorio de trabajo en el contenedor
+# Obtener la imagen de Python
+FROM cgr.dev/chainguard/python:latest-dev AS dev
+# Crear un directorio de trabajo y establecerlo como el directorio de trabajo actual
 WORKDIR /app
-# Copia el package.json y el package-lock.json al contenedor
-COPY package*.json ./
-# Instala las dependencias del proyecto
-RUN npm install
-# Copia el resto de la aplicación al contenedor
-COPY . .
-# Construye la aplicación de Next.js
-RUN npm run build
+# Crear una ambiente virtual para instalar las dependencias
+RUN python -m venv venv
+# Establecer el ambiente virtual al PATH para ser accesible desde Python
+ENV PATH="/app/venv/bin:$PATH"
+# Copiar la lista de dependencias al directorio de trabajo
+COPY requirements.txt requirements.txt
+# Instalar las dependencias
+RUN pip install -r requirements.txt
+# Eliminar pip para evitar brechas de seguridad
+RUN pip uninstall -y pip
 
-# Expone el puerto en el que la aplicación se ejecutará
-EXPOSE 3000
+# Exponer el puerto 8000 del contenedor
+EXPOSE 8000
 
-# Define el comando por defecto para "ejecutar la aplicación
-ENTRYPOINT ["npm", "run", "dev", "--", "--port", "3000"]
+# Establecer el punto de entrada para ejecutar la aplicación
+ENTRYPOINT ["fastapi", "dev", "main.py"]
 ```
 
 ## 📦 Compilar la imagen de Docker
@@ -388,7 +349,7 @@ if docker build -f Dockerfile.dev -t $IMAGE_NAME:$TAG .; then
     #######################################################
     # Crear etiquetas de la imagen compilada
     #######################################################
-
+          
     # Crear una imagen con el tag del último commit
     echo "🔗 Creando un enlace simbólico a $IMAGE_NAME:$TAG"
     docker tag $IMAGE_NAME:$TAG $ORG/$IMAGE_NAME:$TAG
@@ -417,7 +378,7 @@ if docker build -f Dockerfile.dev -t $IMAGE_NAME:$TAG .; then
     #######################################################
     # Enviar la imagen de Docker al registro de contenedor
     #######################################################
-
+    
     # Enviar la imagen al registro de contenedores de Azure Container Registry
     echo "📤 Enviando la imagen $ORG/$IMAGE_NAME:$TAG al registro de contenedores de Azure Container Registry"
     docker push $ORG/$IMAGE_NAME:$TAG
@@ -431,7 +392,7 @@ else
     exit 1
 ```
 
-Para ejecutar el script, abre una termina dentro del mismo directorio donde se encuentra el archivo build_container_dev.sh y escribe lo siguiente para ejecutarlo.
+Para ejecutar el script, abre una termina dentro del mismo directorio donde se encuentra el archivo `build_container_dev.sh` y escribe lo siguiente para ejecutarlo.
 
 ```shell
 # Ejecutar el script de compilación de imágenes de Docker
@@ -491,50 +452,6 @@ Starting Live Log Stream ---
 Para desplegar la aplicación en el ambiente de producción, se necesitan algunos conocimientos básicos de Docker, de Git y de la terminal para administrar los recursos de Azure CLI.
 Los pasos para seguir se describen a continuación:
 
-## ⚡ Modificar configuraciones en `vite.config.js`
-
-> [!IMPORTANT]
-> Esta configuración se permanece sin cambios si ya la modificaste anteriormente cuando implementaste las configuraciones para el ambiente de pruebas. En caso contrario, puede seguir estas mismas instrucciones.
-
-Antes de crear la imagen de Docker del proyecto, se necesita que éste siempre se monte en un puerto permanente, es decir, un puerto definido por el usuario. En este caso, podríamos usar el puerto 3000 para tal uso. Para lograrlo, necesitamos hacer unos ajustes mínimos en el archivo de configuracion de `vite.config.js`:
-
-| Opción       | Descripción                                                                                                                                                                                                                    |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `base`       | Ruta pública base cuando se sirve en desarrollo o producción                                                                                                                                                                   |
-| `plugins`    | Array de plugins a usar                                                                                                                                                                                                        |
-| `preview`    | Un objeto para las opciones de vista previa de la compilación                                                                                                                                                                  |
-| `server`     | Un objeto para las opciones del servidor                                                                                                                                                                                       |
-| `port`       | Especifica el puerto del servidor. Nota: si el puerto ya está siendo usado, Vite intentará automáticamente con el siguiente puerto disponible, por lo que este puede no ser el puerto en el que el servidor termine escuchando |
-| `strictPort` | Establece a true para salir si el puerto ya está en uso, en lugar de intentar automáticamente con el siguiente puerto disponible                                                                                               |
-| `host`       | Especifica en qué direcciones IP debe escuchar el servidor. Establece esto a 0.0.0.0 o true para escuchar todas las direcciones, incluidas las de LAN y públicas                                                               |
-| `origin`     | Define el origen de las URLs de los activos generados durante el desarrollo                                                                                                                                                    |
-
-`vite.config.json`
-
-```raw
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-
-// https://vite.dev/config/
-export default defineConfig({
-  plugins: [react()],
-  /* Referencia
-    https://thedkpatel.medium.com/dockerizing-react-application-built-with-vite-a-simple-guide-4c41eb09defa
-  */
-  base: "/",
-  preview: { // Configuraciones para el production preview
-    port: 3000,
-    strictPort: true,
-  },
-  server: { // Configuraciones para el development preview
-    port: 3000,
-    strictPort: true,
-    host: true,
-    origin: "http://localhost:3000"
-  }
-})
-```
-
 ## 💻 Crear un Dockerfile
 
 > [!NOTE]
@@ -549,24 +466,41 @@ export default defineConfig({
 # Etapa 1: Compilar imagen dev-dependencies #
 #############################################
 
-# Usa una imagen base de Node.js
-FROM node:18-alpine
-# Establece el directorio de trabajo en el contenedor
+# Obtener la imagen de Python
+FROM cgr.dev/chainguard/python:latest-dev AS dev
+# Crear un directorio de trabajo y establecerlo como el directorio de trabajo actual
 WORKDIR /app
-# Copia el package.json y el package-lock.json al contenedor
-COPY package*.json ./
-# Instala las dependencias del proyecto
-RUN npm install
-# Copia el resto de la aplicación al contenedor
-COPY . .
-# Construye la aplicación de Next.js
-RUN npm run build
+# Crear una ambiente virtual para instalar las dependencias
+RUN python -m venv venv
+# Establecer el ambiente virtual al PATH para ser accesible desde Python
+ENV PATH="/app/venv/bin:$PATH"
+# Copiar la lista de dependencias al directorio de trabajo
+COPY requirements.txt requirements.txt
+# Instalar las dependencias
+RUN pip install -r requirements.txt
+# Eliminar pip para evitar conflictos con CVE
+RUN pip uninstall -y pip
 
-# Expone el puerto en el que la aplicación se ejecutará
-EXPOSE 3000
 
-# Define el comando por defecto para ejecutar la aplicación
-ENTRYPOINT ["npm", "run", "dev", "--", "--port", "3000"]
+#############################################
+# Etapa 2: Compilar imagen de producción    #
+#############################################
+# Obtener la imagen de Python mínima
+FROM cgr.dev/chainguard/python:latest AS prod
+# Crear un directorio de trabajo y establecerlo como el directorio de trabajo actual
+WORKDIR /app
+# Copiar el código fuente al directorio de trabajo
+COPY . /app/
+# Copiar el ambiente virtual de la imagen dev-dependencies
+COPY --from=dev /app/venv /app/venv
+# Establecer el ambiente virtual al PATH para ser accesible desde Python
+ENV PATH="/app/venv/bin:$PATH"
+
+# Exponer el puerto 8000 del contenedor
+EXPOSE 8000
+
+# Establecer el punto de entrada para ejecutar la aplicación
+ENTRYPOINT ["fastapi", "run", "main.py"]
 ```
 
 ## 📦 Compilar la imagen de Docker
@@ -602,7 +536,7 @@ if docker build -f Dockerfile.prod -t $IMAGE_NAME:$TAG .; then
     #######################################################
     # Crear etiquetas de la imagen compilada
     #######################################################
-
+          
     # Crear una imagen con el tag del último commit
     echo "🔗 Creando un enlace simbólico a $IMAGE_NAME:$TAG"
     docker tag $IMAGE_NAME:$TAG $ORG/$IMAGE_NAME:$TAG
@@ -631,7 +565,7 @@ if docker build -f Dockerfile.prod -t $IMAGE_NAME:$TAG .; then
     #######################################################
     # Enviar la imagen de Docker al registro de contenedor
     #######################################################
-
+    
     # Enviar la imagen al registro de contenedores de Azure Container Registry
     echo "📤 Enviando la imagen $ORG/$IMAGE_NAME:$TAG al registro de contenedores de Azure Container Registry"
     docker push $ORG/$IMAGE_NAME:$TAG
