@@ -5,8 +5,8 @@ echo "🔍 Obteniendo el tag del último commit"
 TAG=$(git rev-parse --short HEAD)
 
 ### MODIFICAR CON LOS DATOS DE TU PROYECTO #################
-IMAGE_NAME=mycontainer # Nombre de la imagen de Docker
-ORG=mynamespace      # Namespace del registro de contenedor
+IMAGE_NAME=score-credit-backend-prod # Nombre de la imagen de Docker
+ORG=arrendamex.azurecr.io      # Namespace del registro de contenedor
 ###########################################################
 
 # Construir la imagen de Docker
@@ -57,3 +57,4 @@ else
     echo "❌ Ha ocurrido un error al crear la imagen $IMAGE_NAME:$TAG"
     exit 1
 
+fi
