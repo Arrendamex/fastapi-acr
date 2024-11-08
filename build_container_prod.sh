@@ -11,7 +11,7 @@ ORG=mynamespace      # Namespace del registro de contenedor
 
 # Construir la imagen de Docker
 echo "🚀 Construyendo la imagen $IMAGE_NAME:$TAG para producción\n"
-if docker build -f Dockerfile.prod -t $IMAGE_NAME:$TAG .; then
+if docker buildx build --platform linux/amd64 -f Dockerfile.prod -t $IMAGE_NAME:$TAG .; then
     #######################################################
     # Crear etiquetas de la imagen compilada
     #######################################################
